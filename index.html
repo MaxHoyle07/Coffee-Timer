@@ -1,3 +1,469 @@
-<DOCTYPE HTML!>
-    
-</DOCTYPE>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coffee Timer</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      --accent: #c97b41;
+      --accent-dark: #8b4a1f;
+      --surface: rgba(255, 255, 255, 0.85);
+      --text: #1f1f1f;
+      --text-muted: rgba(31, 31, 31, 0.7);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background: linear-gradient(135deg, #f8ede3, #f5c08c);
+      color: var(--text);
+    }
+
+    .app {
+      width: min(620px, 100%);
+      padding: clamp(1.5rem, 4vw, 3rem);
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.12);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    h1 {
+      font-size: clamp(2rem, 6vw, 2.8rem);
+      margin: 0 0 0.75rem;
+      text-align: center;
+      color: var(--accent-dark);
+    }
+
+    .subtitle {
+      margin: 0 0 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .panel {
+      padding: 1.25rem 1.5rem;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .panel h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 0.75rem;
+    }
+
+    .time-display {
+      font-size: clamp(2rem, 5vw, 2.6rem);
+      font-variant-numeric: tabular-nums;
+      margin: 0;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1rem;
+      color: var(--text-muted);
+    }
+
+    .status-indicator {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #999;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+    }
+
+    .status-indicator[data-state="idle"] {
+      background: #999;
+    }
+
+    .status-indicator[data-state="working"] {
+      background: #28a745;
+    }
+
+    .status-indicator[data-state="break"] {
+      background: #e55300;
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 999px;
+      padding: 0.75rem 1.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      color: white;
+      background: var(--accent);
+      box-shadow: 0 8px 16px rgba(201, 123, 65, 0.35);
+    }
+
+    button[disabled] {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    button:active:not([disabled]) {
+      transform: translateY(1px);
+      box-shadow: 0 4px 8px rgba(201, 123, 65, 0.25);
+    }
+
+    .notice {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: rgba(229, 83, 0, 0.1);
+      color: #8b4a1f;
+      border-radius: 12px;
+      border: 1px solid rgba(229, 83, 0, 0.2);
+      display: none;
+    }
+
+    .notice[data-visible="true"] {
+      display: block;
+    }
+
+    .history {
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .history ul {
+      margin: 0.75rem 0 0;
+      padding-left: 1.25rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: radial-gradient(circle at top, #1d1f21, #0f0f0f);
+        color: #f4f5f7;
+      }
+
+      .app {
+        background: rgba(28, 30, 33, 0.85);
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+
+      .panel {
+        background: rgba(20, 22, 24, 0.85);
+        border-color: rgba(255, 255, 255, 0.04);
+      }
+
+      .subtitle {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .status {
+        color: rgba(255, 255, 255, 0.65);
+      }
+
+      .notice {
+        background: rgba(229, 120, 40, 0.12);
+        color: #f0b68b;
+        border-color: rgba(229, 120, 40, 0.35);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" role="main">
+    <h1>Coffee Break Timer</h1>
+    <p class="subtitle">Clock in, stay focused, and pause for a 5 minute coffee every 30 minutes of work.</p>
+
+    <section class="grid" aria-live="polite">
+      <article class="panel" aria-label="Current time">
+        <h2>Current Time</h2>
+        <p class="time-display" id="current-clock">--:--:--</p>
+      </article>
+
+      <article class="panel" aria-label="Work session status">
+        <h2>Session</h2>
+        <p class="time-display" id="work-duration">00:00:00</p>
+        <div class="status">
+          <span class="status-indicator" id="status-indicator" data-state="idle" aria-hidden="true"></span>
+          <span id="status-text">Waiting to clock in</span>
+        </div>
+        <p id="next-break" style="margin-top:0.75rem;color:var(--text-muted);"></p>
+      </article>
+
+      <article class="panel" aria-label="Controls">
+        <h2>Controls</h2>
+        <div class="buttons">
+          <button id="clock-in">Clock In</button>
+          <button id="clock-out" disabled>Clock Out</button>
+          <button id="start-break" disabled>Take Break Now</button>
+        </div>
+        <div class="notice" id="break-notice" role="status"></div>
+      </article>
+
+      <article class="panel" aria-label="Coffee break guidance">
+        <h2>How it works</h2>
+        <p style="margin:0;color:var(--text-muted);">
+          Every thirty minutes of focused work, the timer will automatically cue a
+          five minute coffee break. You can also tap “Take Break Now” any time to
+          step away early. Clock out to pause everything when you finish for the day.
+        </p>
+      </article>
+    </section>
+
+    <section class="history" aria-live="polite" aria-label="Break history">
+      <strong>Break log</strong>
+      <ul id="break-log"></ul>
+    </section>
+  </main>
+
+  <script>
+    const elements = {
+      currentClock: document.getElementById("current-clock"),
+      workDuration: document.getElementById("work-duration"),
+      statusText: document.getElementById("status-text"),
+      statusIndicator: document.getElementById("status-indicator"),
+      nextBreak: document.getElementById("next-break"),
+      breakNotice: document.getElementById("break-notice"),
+      breakLog: document.getElementById("break-log"),
+      buttons: {
+        clockIn: document.getElementById("clock-in"),
+        clockOut: document.getElementById("clock-out"),
+        startBreak: document.getElementById("start-break"),
+      },
+    };
+
+    const WORK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+    const BREAK_LENGTH_MS = 5 * 60 * 1000; // 5 minutes
+
+    let state = {
+      running: false,
+      onBreak: false,
+      workAccumulatedMs: 0,
+      lastTick: null,
+      completedWorkBlocks: 0,
+      tickHandle: null,
+      breakEndTime: null,
+    };
+
+    function formatDuration(ms) {
+      const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+      const hours = Math.floor(totalSeconds / 3600)
+        .toString()
+        .padStart(2, "0");
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+        .toString()
+        .padStart(2, "0");
+      const seconds = Math.floor(totalSeconds % 60)
+        .toString()
+        .padStart(2, "0");
+      return `${hours}:${minutes}:${seconds}`;
+    }
+
+    function formatCountdown(ms) {
+      if (ms <= 0) return "due now";
+      const minutes = Math.floor(ms / 60000);
+      const seconds = Math.floor((ms % 60000) / 1000)
+        .toString()
+        .padStart(2, "0");
+      return minutes > 0
+        ? `${minutes}m ${seconds}s`
+        : `${seconds}s`;
+    }
+
+    function updateClock() {
+      const now = new Date();
+      elements.currentClock.textContent = now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+    }
+
+    function renderStatus() {
+      elements.workDuration.textContent = formatDuration(state.workAccumulatedMs);
+      if (!state.running) {
+        elements.statusText.textContent = "Waiting to clock in";
+        elements.statusIndicator.dataset.state = "idle";
+        elements.nextBreak.textContent = "";
+        elements.breakNotice.dataset.visible = "false";
+        return;
+      }
+
+      if (state.onBreak) {
+        const remaining = Math.max(0, state.breakEndTime - Date.now());
+        elements.statusText.textContent = "On a coffee break";
+        elements.statusIndicator.dataset.state = "break";
+        elements.nextBreak.textContent = `Break ends in ${formatCountdown(
+          remaining
+        )}`;
+        elements.breakNotice.textContent =
+          "Enjoy your coffee! We’ll resume the work timer automatically.";
+        elements.breakNotice.dataset.visible = "true";
+        return;
+      }
+
+      const nextBreakIn =
+        WORK_INTERVAL_MS * (state.completedWorkBlocks + 1) -
+        state.workAccumulatedMs;
+      elements.statusText.textContent = "Focused and working";
+      elements.statusIndicator.dataset.state = "working";
+      elements.nextBreak.textContent = `Next coffee break in ${formatCountdown(
+        nextBreakIn
+      )}`;
+
+      if (nextBreakIn <= 60 * 1000) {
+        elements.breakNotice.textContent =
+          "Coffee break is almost here. Wrap up what you’re doing!";
+        elements.breakNotice.dataset.visible = "true";
+      } else {
+        elements.breakNotice.dataset.visible = "false";
+      }
+    }
+
+    function tick() {
+      const now = Date.now();
+      if (state.lastTick === null) {
+        state.lastTick = now;
+      }
+      const delta = now - state.lastTick;
+      state.lastTick = now;
+
+      if (state.running) {
+        if (state.onBreak) {
+          const remaining = state.breakEndTime - now;
+          if (remaining <= 0) {
+            endBreak();
+          }
+        } else {
+          state.workAccumulatedMs += delta;
+          const nextThreshold =
+            WORK_INTERVAL_MS * (state.completedWorkBlocks + 1);
+          if (state.workAccumulatedMs >= nextThreshold) {
+            startBreak();
+          }
+        }
+      }
+
+      renderStatus();
+    }
+
+    function startWork() {
+      state = {
+        running: true,
+        onBreak: false,
+        workAccumulatedMs: 0,
+        lastTick: Date.now(),
+        completedWorkBlocks: 0,
+        tickHandle: state.tickHandle,
+        breakEndTime: null,
+      };
+
+      elements.buttons.clockIn.disabled = true;
+      elements.buttons.clockOut.disabled = false;
+      elements.buttons.startBreak.disabled = false;
+      elements.breakLog.innerHTML = "";
+      elements.breakNotice.dataset.visible = "false";
+      updateButtonsLabel();
+      renderStatus();
+    }
+
+    function clockOut() {
+      state.running = false;
+      state.onBreak = false;
+      state.lastTick = null;
+      state.breakEndTime = null;
+      elements.buttons.clockIn.disabled = false;
+      elements.buttons.clockOut.disabled = true;
+      elements.buttons.startBreak.disabled = true;
+      elements.breakNotice.dataset.visible = "false";
+      renderStatus();
+    }
+
+    function startBreak(manual = false) {
+      if (!state.running || state.onBreak) return;
+      state.onBreak = true;
+      state.breakEndTime = Date.now() + BREAK_LENGTH_MS;
+      if (manual) {
+        elements.breakNotice.textContent =
+          "Manual break started. Enjoy your coffee!";
+        elements.breakNotice.dataset.visible = "true";
+      } else {
+        elements.breakNotice.textContent =
+          "Time for a 5 minute coffee! Break countdown has begun.";
+        elements.breakNotice.dataset.visible = "true";
+      }
+      updateButtonsLabel();
+    }
+
+    function endBreak() {
+      state.onBreak = false;
+      state.completedWorkBlocks += 1;
+      state.breakEndTime = null;
+      const entry = document.createElement("li");
+      entry.textContent = `Break ${state.completedWorkBlocks} completed at ${new Date().toLocaleTimeString()}`;
+      elements.breakLog.prepend(entry);
+      elements.breakNotice.textContent =
+        "Break finished. Welcome back!";
+      elements.breakNotice.dataset.visible = "true";
+      updateButtonsLabel();
+    }
+
+    function updateButtonsLabel() {
+      if (state.onBreak) {
+        elements.buttons.startBreak.textContent = "Skip Break";
+      } else {
+        elements.buttons.startBreak.textContent = "Take Break Now";
+      }
+    }
+
+    function toggleManualBreak() {
+      if (!state.running) return;
+      if (state.onBreak) {
+        // End break early
+        endBreak();
+      } else {
+        startBreak(true);
+      }
+    }
+
+    elements.buttons.clockIn.addEventListener("click", startWork);
+    elements.buttons.clockOut.addEventListener("click", clockOut);
+    elements.buttons.startBreak.addEventListener("click", toggleManualBreak);
+
+    updateClock();
+    renderStatus();
+    setInterval(updateClock, 1000);
+    state.tickHandle = setInterval(tick, 500);
+  </script>
+</body>
+</html>

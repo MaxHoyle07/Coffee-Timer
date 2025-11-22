@@ -158,7 +158,10 @@
   </div>
 
   <script>
+
     (function () {
+      const API_BASE = "https://api.coffee.apexstudiocodes.co.uk";
+
       const form = document.getElementById('auth-form');
       const message = document.getElementById('message');
       const title = document.getElementById('form-title');
@@ -235,7 +238,10 @@
           return;
         }
 
-        const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+        const endpoint = mode === 'login'
+        ? `${API_BASE}/api/auth/login`
+        : `${API_BASE}/api/auth/register`;
+
 
         try {
           const response = await fetch(endpoint, {

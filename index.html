@@ -1,3 +1,178 @@
-<DOCTYPE HTML!>
-    
-</DOCTYPE>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coffee Timer | Login</title>
+  <style>
+    :root {
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: #0f172a;
+      background-color: #f8fafc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: radial-gradient(circle at 20% 20%, #ffe9d5, transparent 35%),
+        radial-gradient(circle at 80% 0%, #dff3ff, transparent 30%),
+        #f8fafc;
+    }
+
+    .card {
+      width: min(420px, 100%);
+      padding: clamp(1.5rem, 4vw, 2.5rem);
+      border-radius: 18px;
+      background: #ffffff;
+      box-shadow: 0 15px 40px rgba(15, 23, 42, 0.12);
+      border: 1px solid rgba(15, 23, 42, 0.05);
+    }
+
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.75rem, 4vw, 2.1rem);
+      color: #111827;
+      text-align: center;
+    }
+
+    .subtitle {
+      margin: 0 0 1.5rem;
+      color: #475569;
+      text-align: center;
+      font-size: 0.95rem;
+    }
+
+    form {
+      display: grid;
+      gap: 1rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: #0f172a;
+      font-size: 0.95rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.75rem 0.85rem;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      font-size: 1rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+      background: #fff;
+    }
+
+    button {
+      width: 100%;
+      padding: 0.9rem 1rem;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+      box-shadow: 0 12px 25px rgba(234, 88, 12, 0.25);
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); box-shadow: none; }
+
+    .message {
+      min-height: 1.25rem;
+      font-size: 0.95rem;
+      color: #dc2626;
+      text-align: center;
+    }
+
+    .hint {
+      margin-top: 0.5rem;
+      text-align: center;
+      color: #475569;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Welcome back</h1>
+    <p class="subtitle">Sign in to track your work and coffee breaks.</p>
+
+    <form id="login-form">
+      <div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+      </div>
+      <div>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit">Log in</button>
+      <div class="message" id="message"></div>
+    </form>
+
+    <p class="hint">Your session will start after a successful login.</p>
+  </div>
+
+  <script>
+    (function () {
+      const form = document.getElementById('login-form');
+      const message = document.getElementById('message');
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        message.textContent = '';
+
+        const email = form.email.value.trim();
+        const password = form.password.value;
+
+        if (!email || !password) {
+          message.textContent = 'Please enter your email and password.';
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Login failed. Please try again.');
+          }
+
+          const data = await response.json();
+          if (!data.token) {
+            throw new Error('No token returned from server.');
+          }
+
+          localStorage.setItem('token', data.token);
+          window.location.href = 'dashboard.html';
+        } catch (err) {
+          console.error(err);
+          message.textContent = err.message || 'Unable to log in right now.';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

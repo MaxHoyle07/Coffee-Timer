@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coffee Timer | Dashboard</title>
+  <style>
+    :root {
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: #0f172a;
+      background-color: #f8fafc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: radial-gradient(circle at 10% 20%, #ffe9d5, transparent 35%),
+        radial-gradient(circle at 80% 0%, #dff3ff, transparent 30%),
+        #f8fafc;
+    }
+
+    .layout {
+      width: min(1000px, 100%);
+      display: grid;
+      gap: 1.25rem;
+    }
+
+    header {
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.75rem, 4vw, 2.25rem);
+      color: #111827;
+    }
+
+    .subtitle {
+      margin: 0.25rem 0 0;
+      color: #475569;
+      font-size: 0.95rem;
+    }
+
+    .grid { display: grid; gap: 1rem; }
+    @media (min-width: 720px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+
+    .card {
+      padding: 1.25rem 1.4rem;
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: 0 12px 35px rgba(15, 23, 42, 0.12);
+      border: 1px solid rgba(15, 23, 42, 0.05);
+    }
+
+    .stat-value {
+      font-size: clamp(1.8rem, 4vw, 2.2rem);
+      font-weight: 700;
+      margin: 0.15rem 0 0;
+    }
+
+    .stat-label {
+      margin: 0;
+      color: #475569;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      padding: 0.85rem 1.15rem;
+      border-radius: 12px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      box-shadow: 0 10px 22px rgba(234, 88, 12, 0.22);
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+    }
+
+    button.secondary {
+      background: #0f172a;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.18);
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); box-shadow: none; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 0.95rem;
+    }
+
+    th { color: #334155; font-weight: 700; }
+    tbody tr:hover { background: #f8fafc; }
+
+    .empty { color: #94a3b8; text-align: center; padding: 1rem 0; }
+    .status { margin: 0.5rem 0 0; color: #dc2626; text-align: center; min-height: 1.2rem; }
+
+    .detail-input {
+      width: 100%;
+      min-height: 44px;
+      resize: vertical;
+      padding: 0.55rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .detail-input:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+      background: #fff;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+    }
+
+    .small-btn {
+      padding: 0.4rem 0.65rem;
+      font-size: 0.85rem;
+      border-radius: 10px;
+      box-shadow: none;
+      background: #0f172a;
+    }
+
+    .icon-btn {
+      background: none;
+      box-shadow: none;
+      border: 1px solid #e2e8f0;
+      color: #0f172a;
+      padding: 0.45rem;
+      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .icon-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+
+    .icon-btn.danger {
+      color: #b91c1c;
+      border-color: #fecdd3;
+    }
+
+    .inline-note { color: #94a3b8; font-size: 0.85rem; margin-top: 0.3rem; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <h1>Coffee Timer Dashboard</h1>
+      <p class="subtitle">Track your work sessions and coffee breaks.</p>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <p class="stat-label">Today</p>
+        <p class="stat-value" id="today-hours">--</p>
+      </div>
+      <div class="card">
+        <p class="stat-label">This month</p>
+        <p class="stat-value" id="month-hours">--</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="actions">
+        <button id="clock-in">Clock In</button>
+        <button class="secondary" id="clock-out">Clock Out</button>
+      </div>
+      <p class="status" id="status"></p>
+    </section>
+
+    <section class="card">
+      <p class="stat-label" style="margin-bottom:0.35rem;">Recent entries</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Clock in</th>
+              <th>Clock out</th>
+              <th>Duration (min)</th>
+              <th style="width:32%;">Detail</th>
+              <th style="width:70px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr><td class="empty" colspan="6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      const todayHoursEl = document.getElementById('today-hours');
+      const monthHoursEl = document.getElementById('month-hours');
+      const statusEl = document.getElementById('status');
+      const historyBody = document.getElementById('history-body');
+      const clockInBtn = document.getElementById('clock-in');
+      const clockOutBtn = document.getElementById('clock-out');
+
+      const formatDate = (iso) => new Date(iso).toLocaleDateString();
+      const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+
+      const getToken = () => localStorage.getItem('token');
+
+      const ensureToken = () => {
+        const current = getToken();
+        if (!current) {
+          window.location.href = 'index.html';
+          throw new Error('Session expired. Please log in again.');
+        }
+        return current;
+      };
+
+      const handleUnauthorized = () => {
+        localStorage.removeItem('token');
+        statusEl.textContent = 'Session expired. Please log in again.';
+        setTimeout(() => (window.location.href = 'index.html'), 1200);
+      };
+
+      async function fetchHistory() {
+        try {
+          statusEl.textContent = '';
+          const currentToken = ensureToken();
+          const response = await fetch('/api/timer/history', {
+            headers: { Authorization: `Bearer ${currentToken}` },
+          });
+
+          if (!response.ok) {
+            if (response.status === 401) {
+              handleUnauthorized();
+              return;
+            }
+            const errorText = await response.text();
+            throw new Error(errorText || 'Unable to load history.');
+          }
+
+          const data = await response.json();
+          renderStats(data || []);
+          renderTable(data || []);
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = err.message || 'Something went wrong fetching history.';
+          historyBody.innerHTML = '<tr><td class="empty" colspan="6">No data</td></tr>';
+        }
+      }
+
+      function renderStats(entries) {
+        const today = new Date();
+        const todayKey = today.toISOString().slice(0, 10);
+        const month = today.getMonth();
+        const year = today.getFullYear();
+
+        const todayMinutes = entries
+          .filter((item) => item.work_date === todayKey)
+          .reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
+
+        const monthMinutes = entries
+          .filter((item) => {
+            if (!item.work_date) return false;
+            const date = new Date(item.work_date);
+            return date.getMonth() === month && date.getFullYear() === year;
+          })
+          .reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
+
+        todayHoursEl.textContent = (todayMinutes / 60).toFixed(2) + ' hrs';
+        monthHoursEl.textContent = (monthMinutes / 60).toFixed(2) + ' hrs';
+      }
+
+      function renderTable(entries) {
+        if (!entries.length) {
+          historyBody.innerHTML = '<tr><td class="empty" colspan="6">No entries yet</td></tr>';
+          return;
+        }
+
+        const sorted = [...entries].sort((a, b) => new Date(b.work_date) - new Date(a.work_date));
+        historyBody.innerHTML = sorted
+          .map((item) => {
+            const dateText = item.work_date ? new Date(item.work_date).toLocaleDateString() : '--';
+            const detailValue = item.detail ?? item.note ?? '';
+            const clockedOut = Boolean(item.clock_out);
+            return `
+              <tr>
+                <td>${dateText}</td>
+                <td>${formatTime(item.clock_in)}</td>
+                <td>${formatTime(item.clock_out)}</td>
+                <td>${item.duration_minutes ?? '--'}</td>
+                <td>
+                  <div>
+                    <textarea class="detail-input" data-entry-id="${item.id}" ${clockedOut ? '' : 'disabled'} placeholder="Add detail after clocking out">${detailValue || ''}</textarea>
+                    ${clockedOut ? '<p class="inline-note">Save to record what this session was for.</p>' : '<p class="inline-note">Details unlock after clocking out.</p>'}
+                  </div>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button class="small-btn save-detail" data-entry-id="${item.id}" ${clockedOut ? '' : 'disabled'}>Save</button>
+                    <button class="icon-btn danger delete-entry" data-entry-id="${item.id}" aria-label="Delete entry">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join('');
+      }
+
+      async function postAction(endpoint) {
+        try {
+          statusEl.textContent = '';
+          const currentToken = ensureToken();
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${currentToken}` },
+          });
+
+          if (!response.ok) {
+            if (response.status === 401) {
+              handleUnauthorized();
+              return;
+            }
+            const errorText = await response.text();
+            throw new Error(errorText || 'Request failed.');
+          }
+
+          await fetchHistory();
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = err.message || 'Action failed.';
+        }
+      }
+
+      clockInBtn.addEventListener('click', () => postAction('/api/timer/clockin'));
+      clockOutBtn.addEventListener('click', () => postAction('/api/timer/clockout'));
+
+      async function saveDetail(entryId, detail) {
+        try {
+          statusEl.textContent = '';
+          const currentToken = ensureToken();
+          const response = await fetch(`/api/timer/history/${entryId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${currentToken}`,
+            },
+            body: JSON.stringify({ detail }),
+          });
+
+          if (!response.ok) {
+            if (response.status === 401) {
+              handleUnauthorized();
+              return;
+            }
+            const errorText = await response.text();
+            throw new Error(errorText || 'Unable to save detail.');
+          }
+
+          await fetchHistory();
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = err.message || 'Could not save detail.';
+        }
+      }
+
+      async function deleteEntry(entryId) {
+        const confirmed = window.confirm('Delete this entry? This cannot be undone.');
+        if (!confirmed) return;
+
+        try {
+          statusEl.textContent = '';
+          const currentToken = ensureToken();
+          const response = await fetch(`/api/timer/history/${entryId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${currentToken}` },
+          });
+
+          if (!response.ok) {
+            if (response.status === 401) {
+              handleUnauthorized();
+              return;
+            }
+            const errorText = await response.text();
+            throw new Error(errorText || 'Unable to delete entry.');
+          }
+
+          await fetchHistory();
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = err.message || 'Could not delete entry.';
+        }
+      }
+
+      historyBody.addEventListener('click', (event) => {
+        const target = event.target;
+        const entryId = target.getAttribute('data-entry-id');
+        if (!entryId) return;
+
+        if (target.classList.contains('delete-entry')) {
+          deleteEntry(entryId);
+        }
+
+        if (target.classList.contains('save-detail')) {
+          const textarea = historyBody.querySelector(`textarea[data-entry-id="${entryId}"]`);
+          if (!textarea) return;
+          saveDetail(entryId, textarea.value.trim());
+        }
+      });
+
+      fetchHistory();
+    })();
+  </script>
+</body>
+</html>

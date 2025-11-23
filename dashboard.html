@@ -229,229 +229,226 @@
     </section>
   </div>
 
-  <script>
-    (function () {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        window.location.href = 'index.html';
-        return;
-      }
+<script>
+(function () {
+  const API_BASE = "https://api.coffee.apexstudiocodes.co.uk";
 
-      const todayHoursEl = document.getElementById('today-hours');
-      const monthHoursEl = document.getElementById('month-hours');
-      const statusEl = document.getElementById('status');
-      const historyBody = document.getElementById('history-body');
-      const clockInBtn = document.getElementById('clock-in');
-      const clockOutBtn = document.getElementById('clock-out');
+  const token = localStorage.getItem('token');
+  if (!token) {
+    window.location.href = 'index.html';
+    return;
+  }
 
-      const formatDate = (iso) => new Date(iso).toLocaleDateString();
-      const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+  const todayHoursEl = document.getElementById('today-hours');
+  const monthHoursEl = document.getElementById('month-hours');
+  const statusEl = document.getElementById('status');
+  const historyBody = document.getElementById('history-body');
+  const clockInBtn = document.getElementById('clock-in');
+  const clockOutBtn = document.getElementById('clock-out');
 
-      const getToken = () => localStorage.getItem('token');
+  const formatTime = (iso) =>
+    iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
 
-      const ensureToken = () => {
-        const current = getToken();
-        if (!current) {
-          window.location.href = 'index.html';
-          throw new Error('Session expired. Please log in again.');
-        }
-        return current;
-      };
+  const getToken = () => localStorage.getItem('token');
 
-      const handleUnauthorized = () => {
-        localStorage.removeItem('token');
-        statusEl.textContent = 'Session expired. Please log in again.';
-        setTimeout(() => (window.location.href = 'index.html'), 1200);
-      };
+  const ensureToken = () => {
+    const current = getToken();
+    if (!current) {
+      window.location.href = 'index.html';
+      throw new Error('Session expired. Please log in again.');
+    }
+    return current;
+  };
 
-      async function fetchHistory() {
-        try {
-          statusEl.textContent = '';
-          const currentToken = ensureToken();
-          const response = await fetch('/api/timer/history', {
-            headers: { Authorization: `Bearer ${currentToken}` },
-          });
+  const handleUnauthorized = () => {
+    localStorage.removeItem('token');
+    statusEl.textContent = 'Session expired. Please log in again.';
+    setTimeout(() => (window.location.href = 'index.html'), 1200);
+  };
 
-          if (!response.ok) {
-            if (response.status === 401) {
-              handleUnauthorized();
-              return;
-            }
-            const errorText = await response.text();
-            throw new Error(errorText || 'Unable to load history.');
-          }
+  async function fetchHistory() {
+    try {
+      statusEl.textContent = '';
+      const currentToken = ensureToken();
 
-          const data = await response.json();
-          renderStats(data || []);
-          renderTable(data || []);
-        } catch (err) {
-          console.error(err);
-          statusEl.textContent = err.message || 'Something went wrong fetching history.';
-          historyBody.innerHTML = '<tr><td class="empty" colspan="6">No data</td></tr>';
-        }
-      }
-
-      function renderStats(entries) {
-        const today = new Date();
-        const todayKey = today.toISOString().slice(0, 10);
-        const month = today.getMonth();
-        const year = today.getFullYear();
-
-        const todayMinutes = entries
-          .filter((item) => item.work_date === todayKey)
-          .reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
-
-        const monthMinutes = entries
-          .filter((item) => {
-            if (!item.work_date) return false;
-            const date = new Date(item.work_date);
-            return date.getMonth() === month && date.getFullYear() === year;
-          })
-          .reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
-
-        todayHoursEl.textContent = (todayMinutes / 60).toFixed(2) + ' hrs';
-        monthHoursEl.textContent = (monthMinutes / 60).toFixed(2) + ' hrs';
-      }
-
-      function renderTable(entries) {
-        if (!entries.length) {
-          historyBody.innerHTML = '<tr><td class="empty" colspan="6">No entries yet</td></tr>';
-          return;
-        }
-
-        const sorted = [...entries].sort((a, b) => new Date(b.work_date) - new Date(a.work_date));
-        historyBody.innerHTML = sorted
-          .map((item) => {
-            const dateText = item.work_date ? new Date(item.work_date).toLocaleDateString() : '--';
-            const detailValue = item.detail ?? item.note ?? '';
-            const clockedOut = Boolean(item.clock_out);
-            return `
-              <tr>
-                <td>${dateText}</td>
-                <td>${formatTime(item.clock_in)}</td>
-                <td>${formatTime(item.clock_out)}</td>
-                <td>${item.duration_minutes ?? '--'}</td>
-                <td>
-                  <div>
-                    <textarea class="detail-input" data-entry-id="${item.id}" ${clockedOut ? '' : 'disabled'} placeholder="Add detail after clocking out">${detailValue || ''}</textarea>
-                    ${clockedOut ? '<p class="inline-note">Save to record what this session was for.</p>' : '<p class="inline-note">Details unlock after clocking out.</p>'}
-                  </div>
-                </td>
-                <td>
-                  <div class="row-actions">
-                    <button class="small-btn save-detail" data-entry-id="${item.id}" ${clockedOut ? '' : 'disabled'}>Save</button>
-                    <button class="icon-btn danger delete-entry" data-entry-id="${item.id}" aria-label="Delete entry">🗑</button>
-                  </div>
-                </td>
-              </tr>
-            `;
-          })
-          .join('');
-      }
-
-      async function postAction(endpoint) {
-        try {
-          statusEl.textContent = '';
-          const currentToken = ensureToken();
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${currentToken}` },
-          });
-
-          if (!response.ok) {
-            if (response.status === 401) {
-              handleUnauthorized();
-              return;
-            }
-            const errorText = await response.text();
-            throw new Error(errorText || 'Request failed.');
-          }
-
-          await fetchHistory();
-        } catch (err) {
-          console.error(err);
-          statusEl.textContent = err.message || 'Action failed.';
-        }
-      }
-
-      clockInBtn.addEventListener('click', () => postAction('/api/timer/clockin'));
-      clockOutBtn.addEventListener('click', () => postAction('/api/timer/clockout'));
-
-      async function saveDetail(entryId, detail) {
-        try {
-          statusEl.textContent = '';
-          const currentToken = ensureToken();
-          const response = await fetch(`/api/timer/history/${entryId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${currentToken}`,
-            },
-            body: JSON.stringify({ detail }),
-          });
-
-          if (!response.ok) {
-            if (response.status === 401) {
-              handleUnauthorized();
-              return;
-            }
-            const errorText = await response.text();
-            throw new Error(errorText || 'Unable to save detail.');
-          }
-
-          await fetchHistory();
-        } catch (err) {
-          console.error(err);
-          statusEl.textContent = err.message || 'Could not save detail.';
-        }
-      }
-
-      async function deleteEntry(entryId) {
-        const confirmed = window.confirm('Delete this entry? This cannot be undone.');
-        if (!confirmed) return;
-
-        try {
-          statusEl.textContent = '';
-          const currentToken = ensureToken();
-          const response = await fetch(`/api/timer/history/${entryId}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${currentToken}` },
-          });
-
-          if (!response.ok) {
-            if (response.status === 401) {
-              handleUnauthorized();
-              return;
-            }
-            const errorText = await response.text();
-            throw new Error(errorText || 'Unable to delete entry.');
-          }
-
-          await fetchHistory();
-        } catch (err) {
-          console.error(err);
-          statusEl.textContent = err.message || 'Could not delete entry.';
-        }
-      }
-
-      historyBody.addEventListener('click', (event) => {
-        const target = event.target;
-        const entryId = target.getAttribute('data-entry-id');
-        if (!entryId) return;
-
-        if (target.classList.contains('delete-entry')) {
-          deleteEntry(entryId);
-        }
-
-        if (target.classList.contains('save-detail')) {
-          const textarea = historyBody.querySelector(`textarea[data-entry-id="${entryId}"]`);
-          if (!textarea) return;
-          saveDetail(entryId, textarea.value.trim());
-        }
+      const response = await fetch(`${API_BASE}/api/timer/history`, {
+        headers: { Authorization: `Bearer ${currentToken}` },
       });
 
-      fetchHistory();
-    })();
-  </script>
+      if (!response.ok) {
+        if (response.status === 401) return handleUnauthorized();
+        throw new Error((await response.text()) || 'Unable to load history.');
+      }
+
+      const data = await response.json();
+      renderStats(data || []);
+      renderTable(data || []);
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = err.message || 'Something went wrong fetching history.';
+      historyBody.innerHTML = '<tr><td class="empty" colspan="6">No data</td></tr>';
+    }
+  }
+
+  function renderStats(entries) {
+    const today = new Date();
+    const todayKey = today.toISOString().slice(0, 10);
+    const month = today.getMonth();
+    const year = today.getFullYear();
+
+    const todayMinutes = entries
+      .filter((item) => item.work_date === todayKey)
+      .reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
+
+    const monthMinutes = entries
+      .filter((item) => {
+        if (!item.work_date) return false;
+        const date = new Date(item.work_date);
+        return date.getMonth() === month && date.getFullYear() === year;
+      })
+      .reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
+
+    todayHoursEl.textContent = (todayMinutes / 60).toFixed(2) + ' hrs';
+    monthHoursEl.textContent = (monthMinutes / 60).toFixed(2) + ' hrs';
+  }
+
+  function renderTable(entries) {
+    if (!entries.length) {
+      historyBody.innerHTML = '<tr><td class="empty" colspan="6">No entries yet</td></tr>';
+      return;
+    }
+
+    const sorted = [...entries].sort((a, b) => new Date(b.work_date) - new Date(a.work_date));
+
+    historyBody.innerHTML = sorted
+      .map((item) => {
+        const dateText = item.work_date ? new Date(item.work_date).toLocaleDateString() : '--';
+        const detailValue = item.detail ?? '';
+        const clockedOut = Boolean(item.clock_out);
+
+        return `
+          <tr>
+            <td>${dateText}</td>
+            <td>${formatTime(item.clock_in)}</td>
+            <td>${formatTime(item.clock_out)}</td>
+            <td>${item.duration_minutes ?? '--'}</td>
+            <td>
+              <div>
+                <textarea class="detail-input" data-entry-id="${item.id}"
+                  ${clockedOut ? '' : 'disabled'}
+                  placeholder="Add detail after clocking out">${detailValue || ''}</textarea>
+                ${clockedOut
+                  ? '<p class="inline-note">Save to record what this session was for.</p>'
+                  : '<p class="inline-note">Details unlock after clocking out.</p>'}
+              </div>
+            </td>
+            <td>
+              <div class="row-actions">
+                <button class="small-btn save-detail" data-entry-id="${item.id}" ${clockedOut ? '' : 'disabled'}>Save</button>
+                <button class="icon-btn danger delete-entry" data-entry-id="${item.id}" aria-label="Delete entry">🗑</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+  }
+
+  async function postAction(endpoint) {
+    try {
+      statusEl.textContent = '';
+      const currentToken = ensureToken();
+
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${currentToken}` },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) return handleUnauthorized();
+        throw new Error((await response.text()) || 'Request failed.');
+      }
+
+      await fetchHistory();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = err.message || 'Action failed.';
+    }
+  }
+
+  clockInBtn.addEventListener('click', () => postAction('/api/timer/clockin'));
+  clockOutBtn.addEventListener('click', () => postAction('/api/timer/clockout'));
+
+  async function saveDetail(entryId, detail) {
+    try {
+      statusEl.textContent = '';
+      const currentToken = ensureToken();
+
+      const response = await fetch(`${API_BASE}/api/timer/history/${entryId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`,
+        },
+        body: JSON.stringify({ detail }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) return handleUnauthorized();
+        throw new Error((await response.text()) || 'Unable to save detail.');
+      }
+
+      await fetchHistory();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = err.message || 'Could not save detail.';
+    }
+  }
+
+  async function deleteEntry(entryId) {
+    const confirmed = window.confirm('Delete this entry? This cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      statusEl.textContent = '';
+      const currentToken = ensureToken();
+
+      const response = await fetch(`${API_BASE}/api/timer/history/${entryId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${currentToken}` },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) return handleUnauthorized();
+        throw new Error((await response.text()) || 'Unable to delete entry.');
+      }
+
+      await fetchHistory();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = err.message || 'Could not delete entry.';
+    }
+  }
+
+  historyBody.addEventListener('click', (event) => {
+    const target = event.target;
+    const entryId = target.getAttribute('data-entry-id');
+    if (!entryId) return;
+
+    if (target.classList.contains('delete-entry')) {
+      deleteEntry(entryId);
+    }
+
+    if (target.classList.contains('save-detail')) {
+      const textarea = historyBody.querySelector(`textarea[data-entry-id="${entryId}"]`);
+      if (!textarea) return;
+      saveDetail(entryId, textarea.value.trim());
+    }
+  });
+
+  fetchHistory();
+})();
+</script>
+
 </body>
 </html>

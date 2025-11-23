@@ -158,118 +158,136 @@
   </div>
 
   <script>
-    (function () {
-      const form = document.getElementById('auth-form');
-      const message = document.getElementById('message');
-      const title = document.getElementById('form-title');
-      const subtitle = document.getElementById('form-subtitle');
-      const toggleText = document.getElementById('toggle-text');
-      const toggleModeBtn = document.getElementById('toggle-mode');
-      const confirmRow = document.getElementById('confirm-row');
-      const confirmInput = document.getElementById('confirm');
-      const submitBtn = document.getElementById('submit-btn');
+(function () {
+  // Backend API base URL
+  const API_BASE = "https://api.coffee.apexstudiocodes.co.uk";
 
-      const token = localStorage.getItem('token');
-      if (token) {
+  const form = document.getElementById('auth-form');
+  const message = document.getElementById('message');
+  const title = document.getElementById('form-title');
+  const subtitle = document.getElementById('form-subtitle');
+  const toggleText = document.getElementById('toggle-text');
+  const toggleModeBtn = document.getElementById('toggle-mode');
+  const confirmRow = document.getElementById('confirm-row');
+  const confirmInput = document.getElementById('confirm');
+  const submitBtn = document.getElementById('submit-btn');
+
+  // If already logged in, go to dashboard
+  const token = localStorage.getItem('token');
+  if (token) {
+    window.location.href = 'dashboard.html';
+    return;
+  }
+
+  let mode = 'login';
+
+  const setMode = (nextMode, { clearMessage = true } = {}) => {
+    mode = nextMode;
+    const isLogin = mode === 'login';
+
+    title.textContent = isLogin ? 'Welcome back' : 'Create your account';
+    subtitle.textContent = isLogin
+      ? 'Sign in to track your work and coffee breaks.'
+      : 'Register to start logging hours and coffee breaks.';
+
+    confirmRow.classList.toggle('hidden', isLogin);
+    confirmInput.required = !isLogin;
+    submitBtn.textContent = isLogin ? 'Log in' : 'Create account';
+
+    toggleText.innerHTML = isLogin
+      ? 'Need an account? <button class="link-btn" type="button" id="toggle-mode">Create one</button>'
+      : 'Already have an account? <button class="link-btn" type="button" id="toggle-mode">Back to login</button>';
+
+    // Re-bind the dynamic toggle button
+    document.getElementById('toggle-mode')
+      .addEventListener('click', () => setMode(isLogin ? 'register' : 'login'));
+
+    if (clearMessage) {
+      message.textContent = '';
+      message.classList.remove('success');
+    }
+
+    form.reset();
+  };
+
+  toggleModeBtn.addEventListener('click', () => setMode('register'));
+
+  const handleError = async (response) => {
+    let errorText = '';
+    try {
+      errorText = await response.text();
+    } catch (err) {
+      errorText = '';
+    }
+
+    if (response.status === 404) {
+      return 'Endpoint not found (404). Please confirm your API base path.';
+    }
+
+    return errorText || `Request failed (${response.status}). Please try again.`;
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    message.textContent = '';
+    message.classList.remove('success');
+
+    const email = form.email.value.trim();
+    const password = form.password.value;
+    const confirm = form.confirm.value;
+
+    if (!email || !password) {
+      message.textContent = 'Please enter your email and password.';
+      return;
+    }
+
+    if (mode === 'register' && password !== confirm) {
+      message.textContent = 'Passwords must match.';
+      return;
+    }
+
+    // Build correct backend URL
+    const endpoint = mode === 'login'
+      ? `${API_BASE}/api/auth/login`
+      : `${API_BASE}/api/auth/register`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const friendly = await handleError(response);
+        throw new Error(friendly);
+      }
+
+      const data = await response.json().catch(() => ({}));
+
+      // Login success
+      if (data.token) {
+        localStorage.setItem('token', data.token);
         window.location.href = 'dashboard.html';
         return;
       }
 
-      let mode = 'login';
+      // Register success
+      if (mode === 'register') {
+        message.textContent = 'Account created. Please log in.';
+        message.classList.add('success');
+        setMode('login', { clearMessage: false });
+      } else {
+        throw new Error('No token returned from server.');
+      }
 
-      const setMode = (nextMode, { clearMessage = true } = {}) => {
-        mode = nextMode;
-        const isLogin = mode === 'login';
-        title.textContent = isLogin ? 'Welcome back' : 'Create your account';
-        subtitle.textContent = isLogin
-          ? 'Sign in to track your work and coffee breaks.'
-          : 'Register to start logging hours and coffee breaks.';
-        confirmRow.classList.toggle('hidden', isLogin);
-        confirmInput.required = !isLogin;
-        submitBtn.textContent = isLogin ? 'Log in' : 'Create account';
-        toggleText.innerHTML = isLogin
-          ? 'Need an account? <button class="link-btn" type="button" id="toggle-mode">Create one</button>'
-          : 'Already have an account? <button class="link-btn" type="button" id="toggle-mode">Back to login</button>';
-        // Rebind the toggle button after swapping innerHTML
-        document.getElementById('toggle-mode').addEventListener('click', () => setMode(isLogin ? 'register' : 'login'));
-        if (clearMessage) {
-          message.textContent = '';
-          message.classList.remove('success');
-        }
-        form.reset();
-      };
-
-      toggleModeBtn.addEventListener('click', () => setMode('register'));
-
-      const handleError = async (response) => {
-        let errorText = '';
-        try {
-          errorText = await response.text();
-        } catch (err) {
-          errorText = '';
-        }
-
-        if (response.status === 404) {
-          return 'Endpoint not found (404). Please confirm your API base path and that the server is running.';
-        }
-
-        return errorText || `Request failed (${response.status}). Please try again.`;
-      };
-
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        message.textContent = '';
-        message.classList.remove('success');
-
-        const email = form.email.value.trim();
-        const password = form.password.value;
-        const confirm = form.confirm.value;
-
-        if (!email || !password) {
-          message.textContent = 'Please enter your email and password.';
-          return;
-        }
-
-        if (mode === 'register' && password !== confirm) {
-          message.textContent = 'Passwords must match.';
-          return;
-        }
-
-        const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-
-        try {
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-          });
-
-          if (!response.ok) {
-            const friendly = await handleError(response);
-            throw new Error(friendly);
-          }
-
-          const data = await response.json().catch(() => ({}));
-
-          if (data.token) {
-            localStorage.setItem('token', data.token);
-            window.location.href = 'dashboard.html';
-            return;
-          }
-
-          if (mode === 'register') {
-            message.textContent = 'Account created. Please log in to continue.';
-            message.classList.add('success');
-            setMode('login', { clearMessage: false });
-          } else {
-            throw new Error('No token returned from server.');
-          }
-        } catch (err) {
-          console.error(err);
-          message.textContent = err.message || 'Unable to process your request right now.';
-        }
-      });
-    })();
-  </script>
+    } catch (err) {
+      console.error(err);
+      message.textContent = err.message || 'Unable to process your request.';
+    }
+  });
+})();
+</script>
 </body>
 </html>

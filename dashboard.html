@@ -179,6 +179,106 @@
     }
 
     .inline-note { color: #94a3b8; font-size: 0.85rem; margin-top: 0.3rem; }
+
+    .focus-card {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .clock-break {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      align-items: center;
+    }
+
+    .live-clock {
+      font-size: clamp(2.1rem, 5vw, 2.6rem);
+      margin: 0.1rem 0;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .cycle-label {
+      font-weight: 700;
+      margin: 0.15rem 0 0.35rem;
+    }
+
+    .break-actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+
+    .break-actions button {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .cup-wrap {
+      display: grid;
+      place-items: center;
+      gap: 0.35rem;
+    }
+
+    .cup {
+      position: relative;
+      width: 110px;
+      height: 130px;
+      border: 3px solid #0f172a;
+      border-radius: 0 0 18px 18px;
+      overflow: hidden;
+      background: #fff7ed;
+      box-shadow: inset 0 6px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .cup::after {
+      content: "";
+      position: absolute;
+      top: 26px;
+      right: -24px;
+      width: 36px;
+      height: 62px;
+      border: 3px solid #0f172a;
+      border-left: none;
+      border-radius: 0 18px 18px 0;
+      background: rgba(255, 255, 255, 0.85);
+    }
+
+    .cup-fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, #f59e0b, #ea580c);
+      transition: height 0.6s ease;
+    }
+
+    .cup-steam {
+      position: absolute;
+      top: -22px;
+      left: 32px;
+      width: 46px;
+      height: 30px;
+      background: radial-gradient(circle at 50% 100%, rgba(249, 115, 22, 0.25), transparent 65%);
+      animation: steam 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes steam {
+      0% { transform: translateY(6px) scale(0.9); opacity: 0.6; }
+      50% { transform: translateY(-2px) scale(1); opacity: 1; }
+      100% { transform: translateY(10px) scale(0.92); opacity: 0.35; }
+    }
   </style>
 </head>
 <body>
@@ -187,6 +287,32 @@
       <h1>Coffee Timer Dashboard</h1>
       <p class="subtitle">Track your work sessions and coffee breaks.</p>
     </header>
+
+    <section class="card focus-card">
+      <div class="clock-break">
+        <div>
+          <p class="stat-label">Current time</p>
+          <p class="live-clock" id="live-clock">--:--:--</p>
+          <p class="inline-note" id="live-clock-detail">Local time updates every second.</p>
+        </div>
+        <div>
+          <p class="stat-label">Break cadence</p>
+          <p class="cycle-label" id="cycle-status">Waiting for session...</p>
+          <p class="inline-note" id="cycle-detail">Clock in to start the 30/5 flow.</p>
+          <div class="break-actions">
+            <button class="secondary" id="take-break">Take Break Now</button>
+            <button class="secondary" id="skip-break">Skip Break</button>
+          </div>
+        </div>
+        <div class="cup-wrap" aria-label="Coffee cup fill">
+          <div class="cup">
+            <div class="cup-fill" id="cup-fill" style="height: 100%;"></div>
+            <div class="cup-steam"></div>
+          </div>
+          <p class="inline-note" id="cup-label">Cup empties over each 30 min work block.</p>
+        </div>
+      </div>
+    </section>
 
     <section class="grid">
       <div class="card">
@@ -245,6 +371,22 @@
   const historyBody = document.getElementById('history-body');
   const clockInBtn = document.getElementById('clock-in');
   const clockOutBtn = document.getElementById('clock-out');
+  const liveClockEl = document.getElementById('live-clock');
+  const liveClockDetail = document.getElementById('live-clock-detail');
+  const cycleStatusEl = document.getElementById('cycle-status');
+  const cycleDetailEl = document.getElementById('cycle-detail');
+  const cupFillEl = document.getElementById('cup-fill');
+  const cupLabelEl = document.getElementById('cup-label');
+  const takeBreakBtn = document.getElementById('take-break');
+  const skipBreakBtn = document.getElementById('skip-break');
+
+  const WORK_BLOCK_MS = 30 * 60 * 1000; // 30 minutes
+  const BREAK_MS = 5 * 60 * 1000; // 5 minutes
+  const BREAK_STORAGE_KEY = 'coffeeTimerState';
+
+  let cycleState = { mode: 'idle', workStart: null, breakEnd: null, sessionId: null };
+  let tickInterval = null;
+  let liveClockInterval = null;
 
   const formatTime = (iso) =>
     iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
@@ -262,9 +404,204 @@
 
   const handleUnauthorized = () => {
     localStorage.removeItem('token');
+    resetCycleState();
     statusEl.textContent = 'Session expired. Please log in again.';
     setTimeout(() => (window.location.href = 'index.html'), 1200);
   };
+
+  const pad = (num) => String(num).padStart(2, '0');
+
+  const formatDuration = (ms) => {
+    const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${pad(minutes)}:${pad(seconds)}`;
+  };
+
+  function updateLiveClock() {
+    const now = new Date();
+    liveClockEl.textContent = now.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    liveClockDetail.textContent = `Local time: ${now.toLocaleDateString()}`;
+  }
+
+  function startLiveClock() {
+    if (liveClockInterval) return;
+    updateLiveClock();
+    liveClockInterval = setInterval(updateLiveClock, 1000);
+  }
+
+  function saveCycleState() {
+    localStorage.setItem(BREAK_STORAGE_KEY, JSON.stringify(cycleState));
+  }
+
+  function stopTicking() {
+    if (!tickInterval) return;
+    clearInterval(tickInterval);
+    tickInterval = null;
+  }
+
+  function updateCycleUI() {
+    const working = Boolean(cycleState.sessionId);
+    const onBreak = cycleState.mode === 'break';
+    const now = Date.now();
+
+    let statusText = 'Not clocked in';
+    let detailText = 'Clock in to start the 30/5 flow.';
+    let fillPercent = 100;
+
+    if (working && onBreak) {
+      const remaining = Math.max(0, (cycleState.breakEnd || now) - now);
+      statusText = 'On break';
+      detailText = `Break ends in ${formatDuration(remaining)}. Work timer paused.`;
+      fillPercent = 0;
+    } else if (working) {
+      const elapsed = Math.max(0, now - (cycleState.workStart || now));
+      const remaining = Math.max(0, WORK_BLOCK_MS - elapsed);
+      statusText = 'Work block in progress';
+      detailText = `Next break in ${formatDuration(remaining)}.`;
+      fillPercent = Math.max(0, Math.min(100, ((WORK_BLOCK_MS - elapsed) / WORK_BLOCK_MS) * 100));
+    }
+
+    cycleStatusEl.textContent = statusText;
+    cycleDetailEl.textContent = detailText;
+    cupFillEl.style.height = `${fillPercent}%`;
+    cupLabelEl.textContent = onBreak
+      ? 'Cup refills when break ends.'
+      : 'Cup empties over each 30 min work block.';
+
+    takeBreakBtn.disabled = !working || onBreak;
+    skipBreakBtn.disabled = !working || !onBreak;
+  }
+
+  function startTicking() {
+    if (tickInterval) return;
+    tickInterval = setInterval(runCycleTick, 1000);
+  }
+
+  function setCycleState(next) {
+    cycleState = next;
+    saveCycleState();
+    updateCycleUI();
+    if (cycleState.mode === 'idle') {
+      stopTicking();
+    } else {
+      startTicking();
+    }
+  }
+
+  function beginWorkBlock(sessionId, startFrom = Date.now()) {
+    setCycleState({ mode: 'work', workStart: startFrom, breakEnd: null, sessionId });
+  }
+
+  function beginBreak(durationMs = BREAK_MS) {
+    if (!cycleState.sessionId) return;
+    const endsAt = Date.now() + durationMs;
+    setCycleState({ mode: 'break', workStart: null, breakEnd: endsAt, sessionId: cycleState.sessionId });
+  }
+
+  function endBreak() {
+    if (!cycleState.sessionId) return;
+    beginWorkBlock(cycleState.sessionId, Date.now());
+  }
+
+  function resetCycleState() {
+    setCycleState({ mode: 'idle', workStart: null, breakEnd: null, sessionId: null });
+  }
+
+  function runCycleTick() {
+    if (cycleState.mode === 'idle') {
+      stopTicking();
+      return;
+    }
+
+    const now = Date.now();
+
+    if (cycleState.mode === 'work') {
+      const elapsed = Math.max(0, now - (cycleState.workStart || now));
+      const remaining = WORK_BLOCK_MS - elapsed;
+      if (remaining <= 0) {
+        beginBreak();
+        return;
+      }
+    }
+
+    if (cycleState.mode === 'break') {
+      const remaining = Math.max(0, (cycleState.breakEnd || now) - now);
+      if (remaining <= 0) {
+        endBreak();
+        return;
+      }
+    }
+
+    updateCycleUI();
+  }
+
+  function hydrateCycleFromStorage(sessionId) {
+    const raw = localStorage.getItem(BREAK_STORAGE_KEY);
+    if (!raw) return false;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.sessionId !== sessionId) return false;
+
+      cycleState = {
+        mode: parsed.mode || 'work',
+        workStart: parsed.workStart,
+        breakEnd: parsed.breakEnd,
+        sessionId,
+      };
+
+      if (cycleState.mode === 'break' && (cycleState.breakEnd || 0) <= Date.now()) {
+        endBreak();
+        return true;
+      }
+
+      if (cycleState.mode === 'work' && !cycleState.workStart) {
+        cycleState.workStart = Date.now();
+        saveCycleState();
+      }
+
+      startTicking();
+      updateCycleUI();
+      return true;
+    } catch (err) {
+      console.error('Unable to hydrate break state', err);
+      return false;
+    }
+  }
+
+  function syncCycleWithEntries(entries) {
+    const activeEntry = (entries || [])
+      .filter((item) => !item.clock_out)
+      .sort((a, b) => new Date(b.clock_in || b.work_date || 0) - new Date(a.clock_in || a.work_date || 0))[0];
+
+    if (!activeEntry) {
+      resetCycleState();
+      return;
+    }
+
+    const sessionId = String(activeEntry.id ?? activeEntry.work_date ?? activeEntry.clock_in ?? 'session');
+    const sessionStart = activeEntry.clock_in ? new Date(activeEntry.clock_in).getTime() : Date.now();
+
+    if (cycleState.sessionId === sessionId) {
+      if (cycleState.mode === 'idle') {
+        beginWorkBlock(sessionId, sessionStart);
+      } else {
+        startTicking();
+        updateCycleUI();
+      }
+      return;
+    }
+
+    const restored = hydrateCycleFromStorage(sessionId);
+    if (!restored) {
+      beginWorkBlock(sessionId, sessionStart);
+    }
+  }
 
   async function fetchHistory() {
     try {
@@ -283,6 +620,7 @@
       const data = await response.json();
       renderStats(data || []);
       renderTable(data || []);
+      syncCycleWithEntries(data || []);
     } catch (err) {
       console.error(err);
       statusEl.textContent = err.message || 'Something went wrong fetching history.';
@@ -378,6 +716,16 @@
 
   clockInBtn.addEventListener('click', () => postAction('/api/timer/clockin'));
   clockOutBtn.addEventListener('click', () => postAction('/api/timer/clockout'));
+  takeBreakBtn.addEventListener('click', () => {
+    if (takeBreakBtn.disabled) return;
+    statusEl.textContent = 'Break started. Work timer paused.';
+    beginBreak();
+  });
+  skipBreakBtn.addEventListener('click', () => {
+    if (skipBreakBtn.disabled) return;
+    statusEl.textContent = 'Break skipped. Work timer restarted.';
+    endBreak();
+  });
 
   async function saveDetail(entryId, detail) {
     try {
@@ -446,6 +794,8 @@
     }
   });
 
+  startLiveClock();
+  updateCycleUI();
   fetchHistory();
 })();
 </script>
